@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>لوحة التحكم</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="dashboard.html">الرئيسية</a>
+    <a href="products.html">المنتجات</a>
+    <a href="sales.html">فاتورة بيع</a>
+    <a href="customers.html">العملاء</a>
+    <a href="#" onclick="logout()">تسجيل الخروج</a>
+  </nav>
+  <div class="container">
+    <h1>مرحباً، <span id="userName"></span></h1>
+    <div class="cards">
+      <div class="card">
+        <h3>المنتجات</h3>
+        <p id="productCount">--</p>
+      </div>
+      <div class="card">
+        <h3>مبيعات اليوم</h3>
+        <p id="todaySales">--</p>
+      </div>
+    </div>
+  </div>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    const user = JSON.parse(localStorage.getItem('user'));
+    document.getElementById('userName').textContent = user.name;
+
+    async function loadStats() {
+  try {
+    // عدد المنتجات
+    const products = await api.get('/products');
+    document.getElementById('productCount').textContent = products.length;
+
+    // إحصائيات مبيعات اليوم
+    const todayStats = await api.get('/sales/today');
+    document.getElementById('todaySales').textContent = 
+      `${todayStats.sales_count} عملية - ${todayStats.total_amount} ريال`;
+  } catch (err) {
+    console.error(err);
+    // إذا فشل الاتصال (مثلاً 404) نعرض رسالة مؤقتة
+    document.getElementById('todaySales').textContent = 'غير متوفر';
+  }
+}
+    
+    loadStats();
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/index.html';
+    }
+  </script>
+</body>
+</html>

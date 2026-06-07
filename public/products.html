@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>إدارة المنتجات</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="dashboard.html">الرئيسية</a>
+    <a href="products.html">المنتجات</a>
+    <a href="sales.html">فاتورة بيع</a>
+    <a href="customers.html">العملاء</a>
+    <a href="#" onclick="logout()">تسجيل الخروج</a>
+  </nav>
+  <div class="container">
+    <h2>المنتجات</h2>
+    <button onclick="showAddForm()">+ إضافة منتج</button>
+    
+    <table id="productsTable">
+      <thead>
+        <tr>
+          <th>الاسم</th>
+          <th>الباركود</th>
+          <th>سعر الشراء</th>
+          <th>سعر البيع</th>
+          <th>المخزون</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <!-- نموذج إضافة/تعديل (مخفي افتراضياً) -->
+    <div id="productForm" style="display:none;">
+      <h3 id="formTitle">إضافة منتج</h3>
+      <input type="text" id="prodName" placeholder="اسم المنتج" required>
+      <input type="text" id="prodBarcode" placeholder="الباركود">
+      <input type="number" id="prodPurchasePrice" placeholder="سعر الشراء" step="0.01" required>
+      <input type="number" id="prodSellingPrice" placeholder="سعر البيع" step="0.01" required>
+      <input type="number" id="prodStock" placeholder="الكمية" required>
+      <button onclick="saveProduct()">حفظ</button>
+      <button onclick="hideForm()">إلغاء</button>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    let editingId = null;
+
+    async function loadProducts() {
+      try {
+        const products = await api.get('/api/products');
+        const tbody = document.querySelector('#productsTable tbody');
+        tbody.innerHTML = '';
+        products.forEach(p => {
+          tbody.innerHTML += `
+            <tr>
+              <td>${p.name}</td>
+              <td>${p.barcode || ''}</td>
+              <td>${p.purchase_price}</td>
+              <td>${p.selling_price}</td>
+              <td>${p.stock_quantity}</td>
+              <td>
+                <button onclick="editProduct(${p.id})">تعديل</button>
+                <button onclick="deleteProduct(${p.id})">حذف</button>
+              </td>
+            </tr>`;
+        });
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function showAddForm() {
+      editingId = null;
+      document.getElementById('formTitle').textContent = 'إضافة منتج';
+      document.getElementById('productForm').style.display = 'block';
+      clearForm();
+    }
+
+    async function editProduct(id) {
+      try {
+        const product = await api.get(`/api/products/${id}`);
+        document.getElementById('prodName').value = product.name;
+        document.getElementById('prodBarcode').value = product.barcode || '';
+        document.getElementById('prodPurchasePrice').value = product.purchase_price;
+        document.getElementById('prodSellingPrice').value = product.selling_price;
+        document.getElementById('prodStock').value = product.stock_quantity;
+        editingId = id;
+        document.getElementById('formTitle').textContent = 'تعديل منتج';
+        document.getElementById('productForm').style.display = 'block';
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function saveProduct() {
+      const data = {
+        name: document.getElementById('prodName').value,
+        barcode: document.getElementById('prodBarcode').value,
+        purchase_price: parseFloat(document.getElementById('prodPurchasePrice').value),
+        selling_price: parseFloat(document.getElementById('prodSellingPrice').value),
+        stock_quantity: parseInt(document.getElementById('prodStock').value)
+      };
+      try {
+        if (editingId) {
+          await api.put(`/api/products/${editingId}`, data);
+        } else {
+          await api.post('/api/products', data);
+        }
+        hideForm();
+        loadProducts();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteProduct(id) {
+      if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
+        try {
+          await api.delete(`/api/products/${id}`);
+          loadProducts();
+        } catch (err) {
+          alert(err.message);
+        }
+      }
+    }
+
+    function hideForm() {
+      document.getElementById('productForm').style.display = 'none';
+      clearForm();
+    }
+
+    function clearForm() {
+      ['prodName', 'prodBarcode', 'prodPurchasePrice', 'prodSellingPrice', 'prodStock'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/index.html';
+    }
+
+    loadProducts();
+  </script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>فاتورة بيع جديدة</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="dashboard.html">الرئيسية</a>
+    <a href="products.html">المنتجات</a>
+    <a href="sales.html">فاتورة بيع</a>
+    <a href="customers.html">العملاء</a>
+    <a href="#" onclick="logout()">تسجيل الخروج</a>
+  </nav>
+  <div class="container">
+    <h2>فاتورة بيع جديدة</h2>
+    <div class="sale-form">
+      <select id="productSelect">
+        <option value="">اختر منتج...</option>
+      </select>
+      <input type="number" id="quantity" placeholder="الكمية" min="1" value="1">
+      <button onclick="addItem()">أضف للفاتورة</button>
+    </div>
+    <table id="saleItems">
+      <thead>
+        <tr>
+          <th>المنتج</th>
+          <th>السعر</th>
+          <th>الكمية</th>
+          <th>الإجمالي</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div>
+      <label>الخصم:</label>
+      <input type="number" id="discount" value="0" step="0.01">
+    </div>
+    <div>
+      <label>طريقة الدفع:</label>
+      <select id="paymentMethod">
+        <option value="cash">نقدي</option>
+        <option value="card">بطاقة</option>
+        <option value="credit">آجل</option>
+      </select>
+    </div>
+    <button onclick="completeSale()">إتمام البيع</button>
+    <p id="saleResult"></p>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    let saleItems = []; // { product_id, name, price, quantity }
+
+    async function loadProducts() {
+      try {
+        const products = await api.get('/api/products');
+        const select = document.getElementById('productSelect');
+        products.forEach(p => {
+          const option = document.createElement('option');
+          option.value = p.id;
+          option.textContent = `${p.name} (${p.selling_price} ريال) - المخزون: ${p.stock_quantity}`;
+          option.dataset.price = p.selling_price;
+          option.dataset.stock = p.stock_quantity;
+          select.appendChild(option);
+        });
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function addItem() {
+      const select = document.getElementById('productSelect');
+      if (!select.value) return;
+      const productId = select.value;
+      const price = parseFloat(select.options[select.selectedIndex].dataset.price);
+      const stock = parseInt(select.options[select.selectedIndex].dataset.stock);
+      const quantity = parseInt(document.getElementById('quantity').value) || 1;
+      
+      if (quantity > stock) {
+        alert('المخزون غير كافي');
+        return;
+      }
+      
+      const existing = saleItems.find(item => item.product_id == productId);
+      if (existing) {
+        existing.quantity += quantity;
+      } else {
+        saleItems.push({
+          product_id: productId,
+          name: select.options[select.selectedIndex].text.split(' (')[0],
+          price: price,
+          quantity: quantity
+        });
+      }
+      renderSaleItems();
+    }
+
+    function renderSaleItems() {
+      const tbody = document.querySelector('#saleItems tbody');
+      tbody.innerHTML = '';
+      saleItems.forEach(item => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${item.name}</td>
+            <td>${item.price.toFixed(2)}</td>
+            <td>${item.quantity}</td>
+            <td>${(item.price * item.quantity).toFixed(2)}</td>
+          </tr>`;
+      });
+    }
+
+    async function completeSale() {
+      if (saleItems.length === 0) {
+        alert('أضف منتجات إلى الفاتورة');
+        return;
+      }
+      const discount = parseFloat(document.getElementById('discount').value) || 0;
+      const payment = document.getElementById('paymentMethod').value;
+      const itemsPayload = saleItems.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity
+      }));
+      try {
+        const result = await api.post('/api/sales', {
+          items: itemsPayload,
+          discount: discount,
+          payment_method: payment
+        });
+        document.getElementById('saleResult').textContent = 
+          `تمت العملية بنجاح! رقم الفاتورة: ${result.sale_id} - المبلغ النهائي: ${result.final_amount}`;
+        saleItems = [];
+        renderSaleItems();
+        document.getElementById('discount').value = 0;
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/index.html';
+    }
+
+    loadProducts();
+  </script>
+</body>
+</html>
