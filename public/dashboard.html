@@ -9,6 +9,9 @@
   <nav class="navbar">
     <a href="dashboard.html">الرئيسية</a>
     <a href="products.html">المنتجات</a>
+    <a href="purchases.html">المشتريات</a>
+    <a href="currencies.html">العملات</a>
+    <a href="reports.html">تقارير</a>
     <a href="sales.html">فاتورة بيع</a>
     <a href="customers.html">العملاء</a>
     <a href="#" onclick="logout()">تسجيل الخروج</a>
@@ -33,29 +36,33 @@
     document.getElementById('userName').textContent = user.name;
 
     async function loadStats() {
-  try {
-    // عدد المنتجات
-    const products = await api.get('/products');
-    document.getElementById('productCount').textContent = products.length;
+      try {
+        // عدد المنتجات
+        const products = await api.get('/products');
+        document.getElementById('productCount').textContent = products.length;
 
-    // إحصائيات مبيعات اليوم
-    const todayStats = await api.get('/sales/today');
-    document.getElementById('todaySales').textContent = 
-      `${todayStats.sales_count} عملية - ${todayStats.total_amount} ريال`;
-  } catch (err) {
-    console.error(err);
-    // إذا فشل الاتصال (مثلاً 404) نعرض رسالة مؤقتة
-    document.getElementById('todaySales').textContent = 'غير متوفر';
-  }
-}
-    
-    loadStats();
+        // إحصائيات اليوم باستخدام التقارير
+        const today = new Date().toISOString().split('T')[0];
+        const summary = await api.get(`/reports/summary?start_date=${today}&end_date=${today}`);
+        document.getElementById('todaySales').innerHTML = `
+          ${summary.sales_count} عملية بيع - ${summary.total_sales}<br>
+          ${summary.purchase_count} عملية شراء - ${summary.total_purchases}<br>
+          الربح: ${summary.profit}
+        `;
+      } catch (err) {
+        console.error(err);
+        document.getElementById('todaySales').textContent = 'غير متوفر';
+      }
+    }
 
     function logout() {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/index.html';
     }
+
+    loadStats();
+  
   </script>
 </body>
 </html>

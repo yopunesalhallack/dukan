@@ -7,7 +7,6 @@
 //     // items: [{product_id, quantity}]
 //     await conn.beginTransaction();
 
-//     // 1. حساب المبلغ الإجمالي والتحقق من المخزون
 //     let totalAmount = 0;
 //     const saleItems = [];
 
@@ -41,7 +40,7 @@
 //     );
 //     const saleId = saleResult.insertId;
 
-//     // 3. إدخال عناصر الفاتورة وتحديث المخزون
+//    
 //     for (let item of saleItems) {
 //       await conn.query(
 //         'INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?)',
@@ -76,8 +75,7 @@
 //   } catch (error) { next(error); }
 // };
 
-// // يمكن إضافة دوال للتقارير مثل مبيعات يومية، أكثر المنتجات مبيعاً... إلخ
-// // controllers/saleController.js (أضف هذه الدالة)
+// // controllers/saleController.js 
 // exports.getTodayStats = async (req, res, next) => {
 //   try {
 //     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
@@ -95,40 +93,37 @@
 
 const pool = require('../config/db');
 
-// إنشاء فاتورة بيع جديدة
+// create a sale
 exports.createSale = async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
     const { customer_id, items, discount, payment_method } = req.body;
-    // items: مصفوفة من [{product_id, quantity}]
-
     await conn.beginTransaction();
 
-    // 1. حساب المبلغ الإجمالي والتحقق من المخزون
     let totalAmount = 0;
     const saleItems = [];
+    let saleCurrencyId = null;
 
-    for (let item of items) {
-      const [products] = await conn.query(
-        'SELECT id, name, selling_price, stock_quantity FROM products WHERE id = ? FOR UPDATE',
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const [[product]] = await conn.query(
+        'SELECT id, name, selling_price, currency_id, stock_quantity FROM products WHERE id = ? FOR UPDATE',
         [item.product_id]
       );
+      if (!product) throw new Error(`المنتج ${item.product_id} غير موجود`);
 
-      if (products.length === 0) {
-        throw new Error(`المنتج ذو المعرف ${item.product_id} غير موجود`);
+      // تحديد عملة الفاتورة من أول منتج
+      if (i === 0) saleCurrencyId = product.currency_id;
+      else if (product.currency_id !== saleCurrencyId) {
+        throw new Error('جميع المنتجات في الفاتورة يجب أن تكون بنفس العملة');
       }
 
-      const product = products[0];
-
       if (product.stock_quantity < item.quantity) {
-        throw new Error(
-          `المخزون غير كافٍ للمنتج "${product.name}". المتاح: ${product.stock_quantity}`
-        );
+        throw new Error(`المخزون غير كافٍ للمنتج "${product.name}"`);
       }
 
       const totalPrice = product.selling_price * item.quantity;
       totalAmount += totalPrice;
-
       saleItems.push({
         product_id: product.id,
         quantity: item.quantity,
@@ -138,45 +133,26 @@ exports.createSale = async (req, res, next) => {
     }
 
     const finalAmount = totalAmount - (discount || 0);
-
-    // 2. إدخال الفاتورة الرئيسية
-    const [saleResult] = await conn.query(
-      `INSERT INTO sales (user_id, customer_id, total_amount, discount, final_amount, payment_method)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        req.user.id,                  // من توكن JWT
-        customer_id || null,
-        totalAmount,
-        discount || 0,
-        finalAmount,
-        payment_method || 'cash'
-      ]
+    const [result] = await conn.query(
+      `INSERT INTO sales (user_id, customer_id, total_amount, discount, final_amount, currency_id, payment_method)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.id, customer_id || null, totalAmount, discount || 0, finalAmount, saleCurrencyId, payment_method || 'cash']
     );
-    const saleId = saleResult.insertId;
 
-    // 3. إدخال عناصر الفاتورة وتحديث المخزون
     for (let item of saleItems) {
       await conn.query(
         'INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?)',
-        [saleId, item.product_id, item.quantity, item.unit_price, item.total_price]
+        [result.insertId, item.product_id, item.quantity, item.unit_price, item.total_price]
       );
-
-      await conn.query(
-        'UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?',
-        [item.quantity, item.product_id]
-      );
+      await conn.query('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?', [item.quantity, item.product_id]);
     }
 
     await conn.commit();
-
     res.status(201).json({
-      sale_id: saleId,
-      total_amount: totalAmount,
-      discount: discount || 0,
+      sale_id: result.insertId,
       final_amount: finalAmount,
       message: 'تمت عملية البيع بنجاح'
     });
-
   } catch (error) {
     await conn.rollback();
     next(error);
@@ -185,7 +161,7 @@ exports.createSale = async (req, res, next) => {
   }
 };
 
-// جلب فاتورة واحدة مع تفاصيلها
+//Get one bill with its details
 exports.getSaleById = async (req, res, next) => {
   try {
     const [sales] = await pool.query('SELECT * FROM sales WHERE id = ?', [req.params.id]);
@@ -211,11 +187,10 @@ exports.getSaleById = async (req, res, next) => {
     next(error);
   }
 };
-
-// إحصائيات مبيعات اليوم الحالي
+// today statistics 
 exports.getTodayStats = async (req, res, next) => {
   try {
-    const today = new Date().toISOString().split('T')[0]; // مثال "2025-03-15"
+    const today = new Date().toISOString().split('T')[0]; 
 
     const [rows] = await pool.query(
       `SELECT 
@@ -232,8 +207,7 @@ exports.getTodayStats = async (req, res, next) => {
     next(error);
   }
 };
-
-// (اختياري) جلب جميع الفواتير - مفيد لصفحة التقارير لاحقاً
+// get all bills
 exports.getAllSales = async (req, res, next) => {
   try {
     const [sales] = await pool.query(

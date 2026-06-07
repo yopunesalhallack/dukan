@@ -6,6 +6,10 @@ const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const saleRoutes = require('./routes/saleRoutes');
+const currencyRoutes = require('./routes/currencyRoutes');
+const exchangeRoutes = require('./routes/exchangeRoutes');
+const purchaseRoutes = require('./routes/purchaseRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
@@ -18,6 +22,13 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/sales', saleRoutes);
+app.use('/api/currencies', currencyRoutes);
+app.use('/api/exchange', exchangeRoutes);
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/reports', reportRoutes);
+app.use((req, res) => {
+  res.status(404).json({ message: 'المسار غير موجود' });
+});
 
 // Global Error Handler
 app.use(errorHandler);

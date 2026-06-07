@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>فاتورة شراء جديدة</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="dashboard.html">الرئيسية</a>
+    <a href="products.html">المنتجات</a>
+    <a href="sales.html">فاتورة بيع</a>
+    <a href="purchases.html">فاتورة شراء</a>
+    <a href="currencies.html">العملات</a>
+    <a href="reports.html">التقارير</a>
+    <a href="#" onclick="logout()">تسجيل الخروج</a>
+  </nav>
+  <div class="container">
+    <h2>فاتورة شراء جديدة</h2>
+    <p>عملة الفاتورة: <strong><span id="purchaseCurrency">--</span></strong></p>
+    <div class="sale-form">
+      <select id="productSelect">
+        <option value="">اختر منتج...</option>
+      </select>
+      <input type="number" id="quantity" placeholder="الكمية" min="1" value="1">
+      <input type="number" id="unitPrice" placeholder="سعر الوحدة (اختياري)" step="0.01">
+      <button onclick="addItem()">أضف للفاتورة</button>
+    </div>
+    <table id="purchaseItems">
+      <thead>
+        <tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div>
+      <label>الخصم:</label>
+      <input type="number" id="discount" value="0" step="0.01">
+    </div>
+    <button onclick="completePurchase()">إتمام الشراء</button>
+    <p id="purchaseResult"></p>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    let purchaseItems = [];
+    let purchaseCurrencyId = null;
+    let purchaseCurrencySymbol = '';
+
+    async function loadProducts() {
+      try {
+        const products = await api.get('/products');
+        const select = document.getElementById('productSelect');
+        select.innerHTML = '<option value="">اختر منتج...</option>';
+        products.forEach(p => {
+          const option = document.createElement('option');
+          option.value = p.id;
+          option.textContent = `${p.name} (شراء: ${p.purchase_price} ${p.currency_code})`;
+          option.dataset.price = p.purchase_price;
+          option.dataset.currencyId = p.currency_id;
+          option.dataset.currencyCode = p.currency_code;
+          select.appendChild(option);
+        });
+      } catch (err) { alert(err.message); }
+    }
+
+    function addItem() {
+      const select = document.getElementById('productSelect');
+      if (!select.value) return;
+      const idx = select.selectedIndex;
+      const price = parseFloat(document.getElementById('unitPrice').value) || parseFloat(select.options[idx].dataset.price);
+      const quantity = parseInt(document.getElementById('quantity').value) || 1;
+      const currencyId = parseInt(select.options[idx].dataset.currencyId);
+      const name = select.options[idx].text.split(' (')[0];
+
+      if (purchaseItems.length === 0) {
+        purchaseCurrencyId = currencyId;
+        purchaseCurrencySymbol = select.options[idx].dataset.currencyCode;
+        document.getElementById('purchaseCurrency').textContent = purchaseCurrencySymbol;
+      } else if (currencyId !== purchaseCurrencyId) {
+        alert('لا يمكن إضافة منتج بعملة مختلفة');
+        return;
+      }
+
+      const existing = purchaseItems.find(item => item.product_id == select.value);
+      if (existing) {
+        existing.quantity += quantity;
+      } else {
+        purchaseItems.push({
+          product_id: select.value,
+          name: name,
+          unit_price: price,
+          quantity: quantity
+        });
+      }
+      renderItems();
+    }
+
+    function renderItems() {
+      const tbody = document.querySelector('#purchaseItems tbody');
+      tbody.innerHTML = '';
+      purchaseItems.forEach(item => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${item.name}</td>
+            <td>${item.unit_price.toFixed(2)} ${purchaseCurrencySymbol}</td>
+            <td>${item.quantity}</td>
+            <td>${(item.unit_price * item.quantity).toFixed(2)} ${purchaseCurrencySymbol}</td>
+          </tr>`;
+      });
+    }
+
+    async function completePurchase() {
+      if (purchaseItems.length === 0) { alert('أضف منتجات'); return; }
+      const discount = parseFloat(document.getElementById('discount').value) || 0;
+      const itemsPayload = purchaseItems.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price
+      }));
+      try {
+        const result = await api.post('/purchases', {
+          items: itemsPayload,
+          discount: discount,
+          currency_id: purchaseCurrencyId
+        });
+        document.getElementById('purchaseResult').textContent = `تمت العملية! رقم الفاتورة: ${result.purchase_id}`;
+        purchaseItems = [];
+        renderItems();
+        document.getElementById('discount').value = 0;
+      } catch (err) { alert(err.message); }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/index.html';
+    }
+
+    loadProducts();
+  </script>
+</body>
+</html>

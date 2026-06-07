@@ -5,7 +5,7 @@ const pool = require('../config/db');
 exports.register = async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
-    // تحقق من وجود المستخدم
+    // check user is exist
     const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) {
       return res.status(400).json({ message: 'البريد الإلكتروني مستخدم مسبقاً' });

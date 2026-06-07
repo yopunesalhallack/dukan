@@ -10,7 +10,9 @@
     <a href="dashboard.html">الرئيسية</a>
     <a href="products.html">المنتجات</a>
     <a href="sales.html">فاتورة بيع</a>
-    <a href="customers.html">العملاء</a>
+    <a href="purchases.html">فاتورة شراء</a>
+    <a href="currencies.html">العملات</a>
+    <a href="reports.html">التقارير</a>
     <a href="#" onclick="logout()">تسجيل الخروج</a>
   </nav>
   <div class="container">
@@ -24,6 +26,7 @@
           <th>الباركود</th>
           <th>سعر الشراء</th>
           <th>سعر البيع</th>
+          <th>العملة</th>
           <th>المخزون</th>
           <th>إجراءات</th>
         </tr>
@@ -31,13 +34,13 @@
       <tbody></tbody>
     </table>
 
-    <!-- نموذج إضافة/تعديل (مخفي افتراضياً) -->
     <div id="productForm" style="display:none;">
       <h3 id="formTitle">إضافة منتج</h3>
       <input type="text" id="prodName" placeholder="اسم المنتج" required>
       <input type="text" id="prodBarcode" placeholder="الباركود">
       <input type="number" id="prodPurchasePrice" placeholder="سعر الشراء" step="0.01" required>
       <input type="number" id="prodSellingPrice" placeholder="سعر البيع" step="0.01" required>
+       <select id="prodCurrency"></select>
       <input type="number" id="prodStock" placeholder="الكمية" required>
       <button onclick="saveProduct()">حفظ</button>
       <button onclick="hideForm()">إلغاء</button>
@@ -49,9 +52,21 @@
   <script>
     let editingId = null;
 
-    async function loadProducts() {
+     async function loadCurrencies() {
+      const currencies = await api.get('/currencies');
+      const select = document.getElementById('prodCurrency');
+      select.innerHTML = '';
+      currencies.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.code + ' (' + c.symbol + ')';
+        select.appendChild(opt);
+      });
+    }
+
+     async function loadProducts() {
       try {
-        const products = await api.get('/api/products');
+        const products = await api.get('/products');
         const tbody = document.querySelector('#productsTable tbody');
         tbody.innerHTML = '';
         products.forEach(p => {
@@ -61,6 +76,7 @@
               <td>${p.barcode || ''}</td>
               <td>${p.purchase_price}</td>
               <td>${p.selling_price}</td>
+              <td>${p.currency_code || ''}</td>
               <td>${p.stock_quantity}</td>
               <td>
                 <button onclick="editProduct(${p.id})">تعديل</button>
@@ -78,17 +94,20 @@
       document.getElementById('formTitle').textContent = 'إضافة منتج';
       document.getElementById('productForm').style.display = 'block';
       clearForm();
+      loadCurrencies(); // إعادة تحميل القائمة للتأكد
     }
 
     async function editProduct(id) {
       try {
-        const product = await api.get(`/api/products/${id}`);
+        const product = await api.get(`/products/${id}`);
         document.getElementById('prodName').value = product.name;
         document.getElementById('prodBarcode').value = product.barcode || '';
         document.getElementById('prodPurchasePrice').value = product.purchase_price;
         document.getElementById('prodSellingPrice').value = product.selling_price;
         document.getElementById('prodStock').value = product.stock_quantity;
         editingId = id;
+        await loadCurrencies();
+        document.getElementById('prodCurrency').value = product.currency_id;
         document.getElementById('formTitle').textContent = 'تعديل منتج';
         document.getElementById('productForm').style.display = 'block';
       } catch (err) {
@@ -102,13 +121,14 @@
         barcode: document.getElementById('prodBarcode').value,
         purchase_price: parseFloat(document.getElementById('prodPurchasePrice').value),
         selling_price: parseFloat(document.getElementById('prodSellingPrice').value),
+        currency_id: parseInt(document.getElementById('prodCurrency').value),
         stock_quantity: parseInt(document.getElementById('prodStock').value)
       };
       try {
         if (editingId) {
-          await api.put(`/api/products/${editingId}`, data);
+          await api.put(`/products/${editingId}`, data);
         } else {
-          await api.post('/api/products', data);
+          await api.post('/products', data);
         }
         hideForm();
         loadProducts();
@@ -120,7 +140,7 @@
     async function deleteProduct(id) {
       if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
         try {
-          await api.delete(`/api/products/${id}`);
+          await api.delete(`/products/${id}`);
           loadProducts();
         } catch (err) {
           alert(err.message);
@@ -145,6 +165,8 @@
       window.location.href = '/index.html';
     }
 
+    // تحميل أولي
+    loadCurrencies();
     loadProducts();
   </script>
 </body>

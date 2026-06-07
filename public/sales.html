@@ -7,14 +7,17 @@
 </head>
 <body>
   <nav class="navbar">
-    <a href="dashboard.html">الرئيسية</a>
+     <a href="dashboard.html">الرئيسية</a>
     <a href="products.html">المنتجات</a>
     <a href="sales.html">فاتورة بيع</a>
-    <a href="customers.html">العملاء</a>
+    <a href="purchases.html">فاتورة شراء</a>
+    <a href="currencies.html">العملات</a>
+    <a href="reports.html">التقارير</a>
     <a href="#" onclick="logout()">تسجيل الخروج</a>
   </nav>
   <div class="container">
     <h2>فاتورة بيع جديدة</h2>
+    <p>عملة الفاتورة: <strong><span id="saleCurrency">--</span></strong></p>
     <div class="sale-form">
       <select id="productSelect">
         <option value="">اختر منتج...</option>
@@ -24,12 +27,7 @@
     </div>
     <table id="saleItems">
       <thead>
-        <tr>
-          <th>المنتج</th>
-          <th>السعر</th>
-          <th>الكمية</th>
-          <th>الإجمالي</th>
-        </tr>
+        <tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -52,45 +50,59 @@
   <script src="js/api.js"></script>
   <script src="js/auth.js"></script>
   <script>
-    let saleItems = []; // { product_id, name, price, quantity }
+    let saleItems = [];
+    let currentCurrencyId = null;
+    let currentCurrencySymbol = '';
+     // { product_id, name, price, quantity }
 
-    async function loadProducts() {
+   async function loadProducts() {
       try {
-        const products = await api.get('/api/products');
+        const products = await api.get('/products');
         const select = document.getElementById('productSelect');
+        select.innerHTML = '<option value="">اختر منتج...</option>';
         products.forEach(p => {
           const option = document.createElement('option');
           option.value = p.id;
-          option.textContent = `${p.name} (${p.selling_price} ريال) - المخزون: ${p.stock_quantity}`;
+          option.textContent = `${p.name} (${p.selling_price} ${p.currency_code}) - المخزون: ${p.stock_quantity}`;
           option.dataset.price = p.selling_price;
+          option.dataset.currencyId = p.currency_id;
+          option.dataset.currencyCode = p.currency_code;
           option.dataset.stock = p.stock_quantity;
           select.appendChild(option);
         });
-      } catch (err) {
-        alert(err.message);
-      }
+      } catch (err) { alert(err.message); }
     }
 
     function addItem() {
       const select = document.getElementById('productSelect');
       if (!select.value) return;
-      const productId = select.value;
-      const price = parseFloat(select.options[select.selectedIndex].dataset.price);
-      const stock = parseInt(select.options[select.selectedIndex].dataset.stock);
+      const idx = select.selectedIndex;
+      const price = parseFloat(select.options[idx].dataset.price);
+      const stock = parseInt(select.options[idx].dataset.stock);
+      const currencyId = parseInt(select.options[idx].dataset.currencyId);
       const quantity = parseInt(document.getElementById('quantity').value) || 1;
-      
+
       if (quantity > stock) {
         alert('المخزون غير كافي');
         return;
       }
-      
-      const existing = saleItems.find(item => item.product_id == productId);
+
+      if (saleItems.length === 0) {
+        currentCurrencyId = currencyId;
+        currentCurrencySymbol = select.options[idx].dataset.currencyCode;
+        document.getElementById('saleCurrency').textContent = currentCurrencySymbol;
+      } else if (currencyId !== currentCurrencyId) {
+        alert('لا يمكن إضافة منتج بعملة مختلفة في نفس الفاتورة');
+        return;
+      }
+
+      const existing = saleItems.find(item => item.product_id == select.value);
       if (existing) {
         existing.quantity += quantity;
       } else {
         saleItems.push({
-          product_id: productId,
-          name: select.options[select.selectedIndex].text.split(' (')[0],
+          product_id: select.value,
+          name: select.options[idx].text.split(' (')[0],
           price: price,
           quantity: quantity
         });
@@ -105,18 +117,15 @@
         tbody.innerHTML += `
           <tr>
             <td>${item.name}</td>
-            <td>${item.price.toFixed(2)}</td>
+            <td>${item.price.toFixed(2)} ${currentCurrencySymbol}</td>
             <td>${item.quantity}</td>
-            <td>${(item.price * item.quantity).toFixed(2)}</td>
+            <td>${(item.price * item.quantity).toFixed(2)} ${currentCurrencySymbol}</td>
           </tr>`;
       });
     }
 
     async function completeSale() {
-      if (saleItems.length === 0) {
-        alert('أضف منتجات إلى الفاتورة');
-        return;
-      }
+      if (saleItems.length === 0) { alert('أضف منتجات'); return; }
       const discount = parseFloat(document.getElementById('discount').value) || 0;
       const payment = document.getElementById('paymentMethod').value;
       const itemsPayload = saleItems.map(item => ({
@@ -124,19 +133,19 @@
         quantity: item.quantity
       }));
       try {
-        const result = await api.post('/api/sales', {
+        const result = await api.post('/sales', {
           items: itemsPayload,
           discount: discount,
           payment_method: payment
         });
-        document.getElementById('saleResult').textContent = 
-          `تمت العملية بنجاح! رقم الفاتورة: ${result.sale_id} - المبلغ النهائي: ${result.final_amount}`;
+        document.getElementById('saleResult').textContent =
+          `تمت العملية بنجاح! رقم الفاتورة: ${result.sale_id} - المبلغ: ${result.final_amount} ${currentCurrencySymbol}`;
         saleItems = [];
+        currentCurrencyId = null;
+        document.getElementById('saleCurrency').textContent = '--';
         renderSaleItems();
         document.getElementById('discount').value = 0;
-      } catch (err) {
-        alert(err.message);
-      }
+      } catch (err) { alert(err.message); }
     }
 
     function logout() {

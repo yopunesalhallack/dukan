@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>إدارة العملات</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="dashboard.html">الرئيسية</a>
+    <a href="products.html">المنتجات</a>
+    <a href="sales.html">فاتورة بيع</a>
+    <a href="purchases.html">فاتورة شراء</a>
+    <a href="currencies.html">العملات</a>
+    <a href="reports.html">التقارير</a>
+    <a href="#" onclick="logout()">تسجيل الخروج</a>
+  </nav>
+  <div class="container">
+    <h2>العملات</h2>
+    <button onclick="showAddCurrencyForm()">+ إضافة عملة</button>
+    <table id="currenciesTable">
+      <thead>
+        <tr><th>الرمز</th><th>الاسم</th><th>الرمز النقدي</th><th>أساسية</th><th>سعر الصرف</th><th>إجراءات</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div id="currencyForm" style="display:none;">
+      <h3 id="formTitle">إضافة عملة</h3>
+      <input type="text" id="code" placeholder="الرمز (مثلاً USD)">
+      <input type="text" id="name" placeholder="الاسم (دولار)">
+      <input type="text" id="symbol" placeholder="الرمز النقدي ($)">
+      <label><input type="checkbox" id="isDefault"> عملة أساسية</label>
+      <button onclick="saveCurrency()">حفظ</button>
+      <button onclick="hideCurrencyForm()">إلغاء</button>
+    </div>
+
+    <h3>تحديث سعر الصرف</h3>
+    <select id="exchangeCurrency"></select>
+    <input type="number" id="rate" step="0.0001" placeholder="السعر مقابل الأساسية">
+    <button onclick="updateRate()">تحديث</button>
+  </div>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    let editingCurrencyId = null;
+
+    async function loadCurrencies() {
+      try {
+        const currencies = await api.get('/currencies');
+        const tbody = document.querySelector('#currenciesTable tbody');
+        tbody.innerHTML = '';
+        currencies.forEach(c => {
+          tbody.innerHTML += `
+            <tr>
+              <td>${c.code}</td>
+              <td>${c.name}</td>
+              <td>${c.symbol}</td>
+              <td>${c.is_default ? '✅' : ''}</td>
+              <td id="rate-${c.id}">--</td>
+              <td>
+                <button onclick="editCurrency(${c.id})">تعديل</button>
+                <button onclick="deleteCurrency(${c.id})">حذف</button>
+                <button onclick="updateRate(${c.id})">تحديث السعر</button>
+              </td>
+            </tr>`;
+        });
+        await loadRates();
+      } catch (err) { alert(err.message); }
+    }
+
+
+    async function loadRates() {
+  try {
+    const rates = await api.get('/exchange');
+    rates.forEach(r => {
+      const cell = document.getElementById(`rate-${r.id}`);
+      if (cell) {
+        if (r.is_default) {
+          cell.textContent = '1 (أساسية)';
+        } else if (r.rate) {
+          cell.textContent = r.rate;
+        } else {
+          cell.textContent = 'غير محدد';
+        }
+      }
+    });
+  } catch (err) { console.error(err); }
+}
+    function showAddCurrencyForm() {
+      editingCurrencyId = null;
+      document.getElementById('formTitle').textContent = 'إضافة عملة';
+      document.getElementById('currencyForm').style.display = 'block';
+      clearCurrencyForm();
+    }
+
+    async function editCurrency(id) {
+      const currencies = await api.get('/currencies');
+      const currency = currencies.find(c => c.id == id);
+      if (!currency) return;
+      document.getElementById('code').value = currency.code;
+      document.getElementById('name').value = currency.name;
+      document.getElementById('symbol').value = currency.symbol;
+      document.getElementById('isDefault').checked = currency.is_default;
+      editingCurrencyId = id;
+      document.getElementById('formTitle').textContent = 'تعديل عملة';
+      document.getElementById('currencyForm').style.display = 'block';
+    }
+
+    async function saveCurrency() {
+      const data = {
+        code: document.getElementById('code').value,
+        name: document.getElementById('name').value,
+        symbol: document.getElementById('symbol').value,
+        is_default: document.getElementById('isDefault').checked
+      };
+      try {
+        if (editingCurrencyId) {
+          await api.put(`/currencies/${editingCurrencyId}`, data);
+        } else {
+          await api.post('/currencies', data);
+        }
+        hideCurrencyForm();
+        loadCurrencies();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteCurrency(id) {
+      if (confirm('هل تريد حذف العملة؟')) {
+        try {
+          await api.delete(`/currencies/${id}`);
+          loadCurrencies();
+        } catch (err) {
+          alert(err.message);
+        }
+      }
+    }
+
+    async function updateRate() {
+      const currency_id = document.getElementById('exchangeCurrency').value;
+      const rate = document.getElementById('rate').value;
+      if (!currency_id || !rate) return alert('اختر العملة وأدخل السعر');
+      try {
+        await api.post('/exchange', { currency_id, rate });
+        alert('تم تحديث سعر الصرف');
+        loadCurrencies(); // إعادة تحميل القائمة لتظهر الأسعار الجديدة
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function hideCurrencyForm() {
+      document.getElementById('currencyForm').style.display = 'none';
+      clearCurrencyForm();
+    }
+    function clearCurrencyForm() {
+      document.getElementById('code').value = '';
+      document.getElementById('name').value = '';
+      document.getElementById('symbol').value = '';
+      document.getElementById('isDefault').checked = false;
+    }
+    function logout() { localStorage.clear(); window.location.href = '/index.html'; }
+    loadCurrencies();
+  </script>
+</body>
+</html>
