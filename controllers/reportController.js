@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 
-// يجلب سعر الصرف الفعّال لعملة ما قبل تاريخ معين
+// Get the exchange rate for all currency based on the main currency
 async function getEffectiveRate(currencyId, date) {
   const [[row]] = await pool.query(
     `SELECT rate FROM exchange_rates 
@@ -8,10 +8,25 @@ async function getEffectiveRate(currencyId, date) {
      ORDER BY rate_date DESC LIMIT 1`,
     [currencyId, date]
   );
-  if (row) return parseFloat(row.rate);
-  // إذا لم يوجد، فهي العملة الأساسية أو معدلها 1
-  const [[curr]] = await pool.query('SELECT is_default FROM currencies WHERE id = ?', [currencyId]);
-  return curr && curr.is_default ? 1 : 1;
+  return row ? parseFloat(row.rate) : null;
+}
+
+
+async function convertAmount(amount, fromCurrencyId, toCurrencyId, date, defaultCurrencyId) {
+  if (fromCurrencyId === toCurrencyId) return parseFloat(amount);
+  
+  let amountInDefault = parseFloat(amount);
+  if (fromCurrencyId !== defaultCurrencyId) {
+    const rate = await getEffectiveRate(fromCurrencyId, date);
+    if (!rate) throw new Error(`لا يوجد سعر صرف للعملة ${fromCurrencyId} في ${date}`);
+    amountInDefault = amountInDefault / rate;  
+  }
+  
+  if (toCurrencyId === defaultCurrencyId) return amountInDefault;
+  
+  const targetRate = await getEffectiveRate(toCurrencyId, date);
+  if (!targetRate) throw new Error(`لا يوجد سعر صرف للعملة ${toCurrencyId} في ${date}`);
+  return amountInDefault * targetRate; 
 }
 
 exports.getSummary = async (req, res, next) => {
@@ -21,63 +36,67 @@ exports.getSummary = async (req, res, next) => {
       return res.status(400).json({ message: 'يجب تحديد تاريخ البداية والنهاية' });
     }
 
-    // العملة المستهدفة (التي نريد عرض التقرير بها)
-    const targetCurrencyId = currency_id ? parseInt(currency_id) : null;
-    // العملة الأساسية
     const [[defaultCurrency]] = await pool.query('SELECT id FROM currencies WHERE is_default = 1');
     const defaultCurrencyId = defaultCurrency?.id || 1;
-    const effectiveTarget = targetCurrencyId || defaultCurrencyId;
+    const targetCurrencyId = currency_id ? parseInt(currency_id) : defaultCurrencyId;
+    const conversionDate = end_date;
 
-    // جلب المبيعات والمشتريات مجمعة حسب العملة
-    const [sales] = await pool.query(
+    // sum of sales
+    const [salesSummary] = await pool.query(
       `SELECT currency_id, SUM(final_amount) AS total, COUNT(*) AS count
        FROM sales WHERE DATE(sale_date) BETWEEN ? AND ? GROUP BY currency_id`,
       [start_date, end_date]
     );
-    const [purchases] = await pool.query(
+
+    //  sum of pruchases
+    const [purchasesSummary] = await pool.query(
       `SELECT currency_id, SUM(final_amount) AS total, COUNT(*) AS count
        FROM purchases WHERE DATE(purchase_date) BETWEEN ? AND ? GROUP BY currency_id`,
       [start_date, end_date]
     );
 
-    // دالة تحويل من أي عملة إلى العملة المستهدفة
-    const convert = async (amount, fromCurrencyId) => {
-      if (fromCurrencyId === effectiveTarget) return parseFloat(amount);
-      // التحويل إلى العملة الأساسية أولاً
-      let amountInDefault = parseFloat(amount);
-      if (fromCurrencyId !== defaultCurrencyId) {
-        const rate = await getEffectiveRate(fromCurrencyId, end_date);
-        amountInDefault = parseFloat(amount) / rate;
-      }
-      if (effectiveTarget === defaultCurrencyId) return amountInDefault;
-      const targetRate = await getEffectiveRate(effectiveTarget, end_date);
-      return amountInDefault * targetRate;
-    };
+    // 3. sum of profit
+    const [profitRows] = await pool.query(
+      `SELECT s.currency_id, SUM(si.quantity * (si.unit_price - p.purchase_price)) AS profit
+       FROM sale_items si
+       JOIN sales s ON si.sale_id = s.id
+       JOIN products p ON si.product_id = p.id
+       WHERE DATE(s.sale_date) BETWEEN ? AND ?
+       GROUP BY s.currency_id`,
+      [start_date, end_date]
+    );
 
-    let totalSales = 0, totalPurchases = 0, salesCount = 0, purchaseCount = 0;
-    for (let s of sales) {
-      totalSales += await convert(s.total, s.currency_id);
+    let totalSales = 0, totalPurchases = 0, totalProfit = 0;
+    let salesCount = 0, purchaseCount = 0;
+
+    for (let s of salesSummary) {
+      totalSales += await convertAmount(s.total, s.currency_id, targetCurrencyId, conversionDate, defaultCurrencyId);
       salesCount += s.count;
     }
-    for (let p of purchases) {
-      totalPurchases += await convert(p.total, p.currency_id);
+    for (let p of purchasesSummary) {
+      totalPurchases += await convertAmount(p.total, p.currency_id, targetCurrencyId, conversionDate, defaultCurrencyId);
       purchaseCount += p.count;
+    }
+    for (let pr of profitRows) {
+      totalProfit += await convertAmount(pr.profit, pr.currency_id, targetCurrencyId, conversionDate, defaultCurrencyId);
     }
 
     res.json({
       start_date,
       end_date,
-      target_currency_id: effectiveTarget,
+      target_currency_id: targetCurrencyId,
       total_sales: totalSales.toFixed(2),
       total_purchases: totalPurchases.toFixed(2),
-      profit: (totalSales - totalPurchases).toFixed(2),
+      profit: totalProfit.toFixed(2),
       sales_count: salesCount,
       purchase_count: purchaseCount
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-
+//  chart fun
 exports.getChartData = async (req, res, next) => {
   res.json({ message: 'Chart data endpoint ready' });
 };

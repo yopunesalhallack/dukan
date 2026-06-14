@@ -1,160 +1,325 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>فاتورة بيع جديدة</title>
-  <link rel="stylesheet" href="css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فاتورة بيع جديدة | نظام إدارة المتجر</title>
+    <link rel="stylesheet" href="./css/style.css">
+   
 </head>
 <body>
-  <nav class="navbar">
-     <a href="dashboard.html">الرئيسية</a>
-    <a href="products.html">المنتجات</a>
-    <a href="sales.html">فاتورة بيع</a>
-    <a href="purchases.html">فاتورة شراء</a>
-    <a href="currencies.html">العملات</a>
-    <a href="reports.html">التقارير</a>
-    <a href="#" onclick="logout()">تسجيل الخروج</a>
-  </nav>
-  <div class="container">
-    <h2>فاتورة بيع جديدة</h2>
-    <p>عملة الفاتورة: <strong><span id="saleCurrency">--</span></strong></p>
-    <div class="sale-form">
-      <select id="productSelect">
-        <option value="">اختر منتج...</option>
-      </select>
-      <input type="number" id="quantity" placeholder="الكمية" min="1" value="1">
-      <button onclick="addItem()">أضف للفاتورة</button>
-    </div>
-    <table id="saleItems">
-      <thead>
-        <tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-    <div>
-      <label>الخصم:</label>
-      <input type="number" id="discount" value="0" step="0.01">
-    </div>
-    <div>
-      <label>طريقة الدفع:</label>
-      <select id="paymentMethod">
-        <option value="cash">نقدي</option>
-        <option value="card">بطاقة</option>
-        <option value="credit">آجل</option>
-      </select>
-    </div>
-    <button onclick="completeSale()">إتمام البيع</button>
-    <p id="saleResult"></p>
-  </div>
+<div class="app-wrapper">
+    <!-- الشريط الجانبي -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">متجر الهدى</div>
+        <ul class="sidebar-menu">
+            <li class="menu-item"><a href="dashboard.html" class="menu-link"><i class="fas fa-chart-line menu-icon"></i> الرئيسية</a></li>
+            <li class="menu-item"><a href="products.html" class="menu-link"><i class="fas fa-box menu-icon"></i> المنتجات</a></li>
+            <li class="menu-item"><a href="categories.html" class="menu-link"><i class="fas fa-tags menu-icon"></i> التصنيفات</a></li>
+            <li class="menu-item"><a href="sales.html" class="menu-link active"><i class="fas fa-shopping-cart menu-icon"></i> فاتورة بيع</a></li>
+            <li class="menu-item"><a href="purchases.html" class="menu-link"><i class="fas fa-truck menu-icon"></i> فاتورة شراء</a></li>
+            <li class="menu-item"><a href="currencies.html" class="menu-link"><i class="fas fa-money-bill-wave menu-icon"></i> العملات</a></li>
+            <li class="menu-item"><a href="reports.html" class="menu-link"><i class="fas fa-file-contract menu-icon"></i> التقارير</a></li>
+        </ul>
+    </nav>
 
-  <script src="js/api.js"></script>
-  <script src="js/auth.js"></script>
-  <script>
+    <main class="main-content">
+        <header class="main-header">
+            <div class="header-right">
+                <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
+                <h1 class="header-title">فاتورة بيع جديدة</h1>
+            </div>
+            <div class="header-actions">
+                <span id="userInfo">أهلاً، <span id="userName"></span></span>
+                <button class="btn-outline" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> خروج</button>
+            </div>
+        </header>
+
+        <div class="page-container">
+            <div class="card">
+                <h2>اختيار المنتج</h2>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label for="productSelect">المنتج</label>
+                        <select id="productSelect" class="form-control">
+                            <option value="">اختر منتج...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity">الكمية</label>
+                        <input type="number" id="quantity" class="form-control" placeholder="الكمية" min="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <button type="button" class="btn btn-primary" id="addItemBtn"><i class="fas fa-plus"></i> أضف للفاتورة</button>
+                    </div>
+                    <div class="form-group">
+                        <button type="button" class="btn btn-outline" id="voiceSelectBtn"><i class="fas fa-microphone"></i> اختيار صوتي</button>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>عملة الفاتورة: <strong id="saleCurrency">--</strong></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card table-container">
+                <h2>عناصر الفاتورة</h2>
+                <table id="saleItemsTable">
+                    <thead>
+                        <tr>
+                            <th>المنتج</th>
+                            <th>السعر</th>
+                            <th>الكمية</th>
+                            <th>الإجمالي</th>
+                        </tr>
+                    </thead>
+                    <tbody id="saleItemsBody"></tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="discount">الخصم</label>
+                        <input type="number" id="discount" class="form-control" value="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="paymentMethod">طريقة الدفع</label>
+                        <select id="paymentMethod" class="form-control">
+                            <option value="cash">نقدي</option>
+                            <option value="card">بطاقة</option>
+                            <option value="credit">آجل</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <button type="button" class="btn btn-success" id="completeSaleBtn"><i class="fas fa-check"></i> إتمام البيع</button>
+                    </div>
+                </div>
+                <p id="saleResult" style="margin-top: 10px; color: var(--success);"></p>
+            </div>
+        </div>
+    </main>
+</div>
+
+<button class="voice-btn" id="globalVoiceBtn"><i class="fas fa-microphone"></i></button>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+    // auth 
+    // check permision
+    if (!localStorage.getItem('token')) window.location.href = 'index.html';
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user && user.name) document.getElementById('userName').textContent = user.name;
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = 'index.html';
+    });
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    menuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+
     let saleItems = [];
     let currentCurrencyId = null;
     let currentCurrencySymbol = '';
-     // { product_id, name, price, quantity }
 
-   async function loadProducts() {
-      try {
-        const products = await api.get('/products');
-        const select = document.getElementById('productSelect');
-        select.innerHTML = '<option value="">اختر منتج...</option>';
-        products.forEach(p => {
-          const option = document.createElement('option');
-          option.value = p.id;
-          option.textContent = `${p.name} (${p.selling_price} ${p.currency_code}) - المخزون: ${p.stock_quantity}`;
-          option.dataset.price = p.selling_price;
-          option.dataset.currencyId = p.currency_id;
-          option.dataset.currencyCode = p.currency_code;
-          option.dataset.stock = p.stock_quantity;
-          select.appendChild(option);
-        });
-      } catch (err) { alert(err.message); }
+    async function loadProducts() {
+        try {
+            const products = await api.get('/products');
+            const select = document.getElementById('productSelect');
+            select.innerHTML = '<option value="">اختر منتج...</option>';
+            products.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = `${p.name} (${p.selling_price} ${p.currency_code}) - المخزون: ${p.stock_quantity}`;
+                option.dataset.price = p.selling_price;
+                option.dataset.currencyId = p.currency_id;
+                option.dataset.currencyCode = p.currency_code;
+                option.dataset.stock = p.stock_quantity;
+                option.dataset.barcode = p.barcode || '';
+                select.appendChild(option);
+            });
+        } catch (err) {
+            alert('فشل تحميل المنتجات: ' + err.message);
+        }
     }
 
     function addItem() {
-      const select = document.getElementById('productSelect');
-      if (!select.value) return;
-      const idx = select.selectedIndex;
-      const price = parseFloat(select.options[idx].dataset.price);
-      const stock = parseInt(select.options[idx].dataset.stock);
-      const currencyId = parseInt(select.options[idx].dataset.currencyId);
-      const quantity = parseInt(document.getElementById('quantity').value) || 1;
+        const select = document.getElementById('productSelect');
+        if (!select.value) {
+            alert('اختر منتج أولاً');
+            return;
+        }
+        const idx = select.selectedIndex;
+        const price = parseFloat(select.options[idx].dataset.price);
+        const stock = parseInt(select.options[idx].dataset.stock);
+        const currencyId = parseInt(select.options[idx].dataset.currencyId);
+        let quantity = parseInt(document.getElementById('quantity').value) || 1;
+        if (quantity <= 0) quantity = 1;
 
-      if (quantity > stock) {
-        alert('المخزون غير كافي');
-        return;
-      }
+        if (quantity > stock) {
+            alert('المخزون غير كافي');
+            return;
+        }
 
-      if (saleItems.length === 0) {
-        currentCurrencyId = currencyId;
-        currentCurrencySymbol = select.options[idx].dataset.currencyCode;
-        document.getElementById('saleCurrency').textContent = currentCurrencySymbol;
-      } else if (currencyId !== currentCurrencyId) {
-        alert('لا يمكن إضافة منتج بعملة مختلفة في نفس الفاتورة');
-        return;
-      }
+        if (saleItems.length === 0) {
+            currentCurrencyId = currencyId;
+            currentCurrencySymbol = select.options[idx].dataset.currencyCode;
+            document.getElementById('saleCurrency').textContent = currentCurrencySymbol;
+        } else if (currencyId !== currentCurrencyId) {
+            alert('لا يمكن إضافة منتج بعملة مختلفة في نفس الفاتورة');
+            return;
+        }
 
-      const existing = saleItems.find(item => item.product_id == select.value);
-      if (existing) {
-        existing.quantity += quantity;
-      } else {
-        saleItems.push({
-          product_id: select.value,
-          name: select.options[idx].text.split(' (')[0],
-          price: price,
-          quantity: quantity
-        });
-      }
-      renderSaleItems();
+        const productId = select.value;
+        const existing = saleItems.find(item => item.product_id == productId);
+        if (existing) {
+            if (existing.quantity + quantity > stock) {
+                alert(`الكمية المضافة تتجاوز المخزون المتاح (المتبقي: ${stock - existing.quantity})`);
+                return;
+            }
+            existing.quantity += quantity;
+        } else {
+            saleItems.push({
+                product_id: productId,
+                name: select.options[idx].text.split(' (')[0],
+                price: price,
+                quantity: quantity
+            });
+        }
+        renderSaleItems();
+        document.getElementById('quantity').value = 1;
     }
 
     function renderSaleItems() {
-      const tbody = document.querySelector('#saleItems tbody');
-      tbody.innerHTML = '';
-      saleItems.forEach(item => {
-        tbody.innerHTML += `
-          <tr>
-            <td>${item.name}</td>
-            <td>${item.price.toFixed(2)} ${currentCurrencySymbol}</td>
-            <td>${item.quantity}</td>
-            <td>${(item.price * item.quantity).toFixed(2)} ${currentCurrencySymbol}</td>
-          </tr>`;
-      });
+        const tbody = document.getElementById('saleItemsBody');
+        tbody.innerHTML = '';
+        saleItems.forEach(item => {
+            const total = (item.price * item.quantity).toFixed(2);
+            tbody.innerHTML += `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.price.toFixed(2)} ${currentCurrencySymbol}</td>
+                    <td>${item.quantity}</td>
+                    <td>${total} ${currentCurrencySymbol}</td>
+                </tr>
+            `;
+        });
     }
 
     async function completeSale() {
-      if (saleItems.length === 0) { alert('أضف منتجات'); return; }
-      const discount = parseFloat(document.getElementById('discount').value) || 0;
-      const payment = document.getElementById('paymentMethod').value;
-      const itemsPayload = saleItems.map(item => ({
-        product_id: item.product_id,
-        quantity: item.quantity
-      }));
-      try {
-        const result = await api.post('/sales', {
-          items: itemsPayload,
-          discount: discount,
-          payment_method: payment
-        });
-        document.getElementById('saleResult').textContent =
-          `تمت العملية بنجاح! رقم الفاتورة: ${result.sale_id} - المبلغ: ${result.final_amount} ${currentCurrencySymbol}`;
-        saleItems = [];
-        currentCurrencyId = null;
-        document.getElementById('saleCurrency').textContent = '--';
-        renderSaleItems();
-        document.getElementById('discount').value = 0;
-      } catch (err) { alert(err.message); }
+        if (saleItems.length === 0) {
+            alert('أضف منتجات للفاتورة أولاً');
+            return;
+        }
+        const discount = parseFloat(document.getElementById('discount').value) || 0;
+        const paymentMethod = document.getElementById('paymentMethod').value;
+        const itemsPayload = saleItems.map(item => ({
+            product_id: item.product_id,
+            quantity: item.quantity
+        }));
+        try {
+            const result = await api.post('/sales', {
+                items: itemsPayload,
+                discount: discount,
+                payment_method: paymentMethod
+            });
+            const msg = `تمت العملية بنجاح! رقم الفاتورة: ${result.sale_id} - المبلغ: ${result.final_amount} ${currentCurrencySymbol}`;
+            document.getElementById('saleResult').textContent = msg;
+            speak(msg);
+            // إعادة تعيين
+            saleItems = [];
+            currentCurrencyId = null;
+            document.getElementById('saleCurrency').textContent = '--';
+            renderSaleItems();
+            document.getElementById('discount').value = 0;
+        } catch (err) {
+            alert(err.message);
+            speak('حدث خطأ أثناء عملية البيع');
+        }
     }
 
-    function logout() {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/index.html';
+    function speak(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ar-SA';
+            window.speechSynthesis.speak(utterance);
+        }
     }
+
+    async function voiceSelectProduct() {
+        if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+            alert('المتصفح لا يدعم التعرف على الصوت');
+            return;
+        }
+        const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'ar-SA';
+        recognition.interimResults = false;
+        recognition.start();
+
+        recognition.onresult = (event) => {
+            const spokenText = event.results[0][0].transcript;
+            console.log('النص المتحدث:', spokenText);
+            const select = document.getElementById('productSelect');
+            for (let i = 0; i < select.options.length; i++) {
+                const optionText = select.options[i].text;
+                if (optionText.includes(spokenText)) {
+                    select.selectedIndex = i;
+                    speak(`تم اختيار ${select.options[i].text.split(' (')[0]}`);
+                    return;
+                }
+            }
+            speak('لم أجد منتجاً بهذا الاسم');
+        };
+        recognition.onerror = () => {
+            speak('حدث خطأ في التعرف على الصوت');
+        };
+    }
+
+    document.getElementById('addItemBtn').addEventListener('click', addItem);
+    document.getElementById('voiceSelectBtn').addEventListener('click', voiceSelectProduct);
+    document.getElementById('completeSaleBtn').addEventListener('click', completeSale);
 
     loadProducts();
-  </script>
+
+    let globalRecognition = null;
+    let isGlobalListening = false;
+    const globalVoiceBtn = document.getElementById('globalVoiceBtn');
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+        globalRecognition = new SpeechRecognition();
+        globalRecognition.lang = 'ar-SA';
+        globalRecognition.continuous = false;
+        globalRecognition.onstart = () => {
+            isGlobalListening = true;
+            globalVoiceBtn.classList.add('listening');
+        };
+        globalRecognition.onend = () => {
+            isGlobalListening = false;
+            globalVoiceBtn.classList.remove('listening');
+        };
+        globalRecognition.onresult = (e) => {
+            const cmd = e.results[0][0].transcript;
+            if (cmd.includes('الرئيسية')) window.location.href = 'dashboard.html';
+            else if (cmd.includes('المنتجات')) window.location.href = 'products.html';
+            else if (cmd.includes('فاتورة بيع')) window.location.href = 'sales.html';
+            else speak('عذراً، لم أفهم الأمر');
+        };
+        globalVoiceBtn.addEventListener('click', () => {
+            if (!isGlobalListening) {
+                speak('تحدث الآن');
+                setTimeout(() => globalRecognition.start(), 1500);
+            } else {
+                globalRecognition.stop();
+            }
+        });
+    } else {
+        globalVoiceBtn.style.display = 'none';
+    }
+</script>
 </body>
 </html>

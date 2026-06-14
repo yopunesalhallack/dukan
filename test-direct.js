@@ -1,5 +1,5 @@
 // test-direct.js
-require('dotenv').config();  // تأكد من تثبيت dotenv
+require('dotenv').config();      
 const mysql = require('mysql2/promise');
 
 (async () => {

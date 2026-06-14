@@ -41,7 +41,7 @@ exports.create = async (req, res, next) => {
          VALUES (?, ?, ?, ?, ?)`,
         [result.insertId, item.product_id, item.quantity, item.unit_price, item.total_price]
       );
-      // زيادة المخزون
+      //  add to stock
       await conn.query('UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?', [item.quantity, item.product_id]);
     }
 

@@ -1,6 +1,5 @@
-const API_BASE = 'http://localhost:5000/api'; // نفس الخادم، نستخدم مسارات نسبية
+const API_BASE = 'http://localhost:5000/api'; 
 
-//const API_BASE = '/api';   // كل طلبات API تبدأ بـ /api
 
 const api = {
   getToken() {

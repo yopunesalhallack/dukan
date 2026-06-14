@@ -1,68 +1,225 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>لوحة التحكم</title>
-  <link rel="stylesheet" href="css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التحكم | نظام إدارة المتجر</title>
+ 
+    <link rel="stylesheet" href="./css/style.css">
+   
 </head>
 <body>
-  <nav class="navbar">
-    <a href="dashboard.html">الرئيسية</a>
-    <a href="products.html">المنتجات</a>
-    <a href="purchases.html">المشتريات</a>
-    <a href="currencies.html">العملات</a>
-    <a href="reports.html">تقارير</a>
-    <a href="sales.html">فاتورة بيع</a>
-    <a href="customers.html">العملاء</a>
-    <a href="#" onclick="logout()">تسجيل الخروج</a>
-  </nav>
-  <div class="container">
-    <h1>مرحباً، <span id="userName"></span></h1>
-    <div class="cards">
-      <div class="card">
-        <h3>المنتجات</h3>
-        <p id="productCount">--</p>
-      </div>
-      <div class="card">
-        <h3>مبيعات اليوم</h3>
-        <p id="todaySales">--</p>
-      </div>
-    </div>
-  </div>
-  <script src="js/api.js"></script>
-  <script src="js/auth.js"></script>
-  <script>
+<div class="app-wrapper">
+  
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">متجر الهدى</div>
+        <ul class="sidebar-menu">
+            <li class="menu-item"><a href="dashboard.html" class="menu-link active"><i class="fas fa-chart-line menu-icon"></i> الرئيسية</a></li>
+            <li class="menu-item"><a href="products.html" class="menu-link"><i class="fas fa-box menu-icon"></i> المنتجات</a></li>
+            <li class="menu-item"><a href="categories.html" class="menu-link"><i class="fas fa-tags menu-icon"></i> التصنيفات</a></li>
+            <li class="menu-item"><a href="sales.html" class="menu-link"><i class="fas fa-shopping-cart menu-icon"></i> فاتورة بيع</a></li>
+            <li class="menu-item"><a href="purchases.html" class="menu-link"><i class="fas fa-truck menu-icon"></i> فاتورة شراء</a></li>
+            <li class="menu-item"><a href="currencies.html" class="menu-link"><i class="fas fa-money-bill-wave menu-icon"></i> العملات</a></li>
+            <li class="menu-item"><a href="reports.html" class="menu-link"><i class="fas fa-file-contract menu-icon"></i> التقارير</a></li>
+            <li class="menu-item"><a href="customers.html" class="menu-link"><i class="fas fa-users menu-icon"></i> العملاء</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        <header class="main-header">
+            <div class="header-right">
+                <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
+                <h1 class="header-title">لوحة التحكم</h1>
+            </div>
+            <div class="header-actions">
+                <span id="userInfo">أهلاً، <span id="userName"></span></span>
+                <button class="btn-outline" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> خروج</button>
+            </div>
+        </header>
+
+        <div class="page-container">
+            <div id="alertArea"></div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <i class="fas fa-boxes stat-icon"></i>
+                    <div class="stat-info">
+                        <div class="stat-value" id="productCount">--</div>
+                        <div class="stat-label">إجمالي المنتجات</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-cash-register stat-icon"></i>
+                    <div class="stat-info">
+                        <div class="stat-value" id="todaySales">--</div>
+                        <div class="stat-label">مبيعات اليوم (ج.س)</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-truck stat-icon"></i>
+                    <div class="stat-info">
+                        <div class="stat-value" id="todayPurchases">--</div>
+                        <div class="stat-label">مشتريات اليوم (ج.س)</div>
+                    </div>
+                </div>
+                <div class="stat-card" style="border-right: 4px solid var(--success);">
+                    <i class="fas fa-chart-line stat-icon"></i>
+                    <div class="stat-info">
+                        <div class="stat-value" id="profitToday">--</div>
+                        <div class="stat-label">صافي الربح اليومي</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<button class="voice-btn" id="globalVoiceBtn" title="تحدث مع النظام"><i class="fas fa-microphone"></i></button>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
     const user = JSON.parse(localStorage.getItem('user'));
-    document.getElementById('userName').textContent = user.name;
-
-    async function loadStats() {
-      try {
-        // عدد المنتجات
-        const products = await api.get('/products');
-        document.getElementById('productCount').textContent = products.length;
-
-        // إحصائيات اليوم باستخدام التقارير
-        const today = new Date().toISOString().split('T')[0];
-        const summary = await api.get(`/reports/summary?start_date=${today}&end_date=${today}`);
-        document.getElementById('todaySales').innerHTML = `
-          ${summary.sales_count} عملية بيع - ${summary.total_sales}<br>
-          ${summary.purchase_count} عملية شراء - ${summary.total_purchases}<br>
-          الربح: ${summary.profit}
-        `;
-      } catch (err) {
-        console.error(err);
-        document.getElementById('todaySales').textContent = 'غير متوفر';
-      }
+    if (user && user.name) {
+        document.getElementById('userName').textContent = user.name;
+    } else {
+        window.location.href = 'index.html';
     }
 
+    // logout
     function logout() {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/index.html';
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = 'index.html';
+    }
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+
+    // ==========  statistics==========
+    async function loadStats() {
+        try {
+            // get all products
+            const products = await api.get('/products');
+            document.getElementById('productCount').textContent = products.length;
+
+            // get today report
+            const today = new Date().toISOString().split('T')[0];
+            const summary = await api.get(`/reports/summary?start_date=${today}&end_date=${today}`);
+            
+            document.getElementById('todaySales').textContent = summary.total_sales || 0;
+            document.getElementById('todayPurchases').textContent = summary.total_purchases || 0;
+            document.getElementById('profitToday').textContent = summary.profit || 0;
+
+            const profitElem = document.getElementById('profitToday');
+            if (summary.profit < 0) profitElem.style.color = 'var(--danger)';
+            else profitElem.style.color = 'var(--success)';
+
+            // api.get('/products/low-stock') ...
+        } catch (err) {
+            console.error('خطأ في جلب الإحصائيات:', err);
+            document.getElementById('todaySales').textContent = 'خطأ';
+            document.getElementById('todayPurchases').textContent = 'خطأ';
+            document.getElementById('profitToday').textContent = 'خطأ';
+            const alertArea = document.getElementById('alertArea');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger';
+            alertDiv.innerHTML = 'فشل تحميل البيانات. تأكد من اتصال الخادم.';
+            alertArea.appendChild(alertDiv);
+            setTimeout(() => alertDiv.remove(), 4000);
+        }
     }
 
     loadStats();
-  
-  </script>
+
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    if (menuToggle) {
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+        });
+    }
+
+    
+    const voiceSynth = {
+        speak: (text) => {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ar-SA';
+                utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+    };
+
+    let recognition = null;
+    let isListening = false;
+    const voiceBtn = document.getElementById('globalVoiceBtn');
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.lang = 'ar-SA';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        recognition.onstart = () => {
+            isListening = true;
+            voiceBtn.classList.add('listening');
+        };
+        recognition.onend = () => {
+            isListening = false;
+            voiceBtn.classList.remove('listening');
+        };
+        recognition.onerror = (event) => {
+            console.error('خطأ في الصوت:', event.error);
+            isListening = false;
+            voiceBtn.classList.remove('listening');
+        };
+        recognition.onresult = (event) => {
+            const text = event.results[0][0].transcript;
+            console.log('النص:', text);
+            handleVoiceCommand(text);
+        };
+    } else {
+        voiceBtn.style.display = 'none';
+    }
+
+    function startListening() {
+        if (recognition && !isListening) {
+            voiceSynth.speak("نعم، كيف يمكنني مساعدتك؟");
+            setTimeout(() => {
+                recognition.start();
+            }, 2000);
+        }
+    }
+
+    function handleVoiceCommand(text) {
+        text = text.toLowerCase();
+        if (text.includes('الرئيسية') || text.includes('لوحة التحكم')) {
+            window.location.href = 'dashboard.html';
+        } else if (text.includes('المنتجات') || text.includes('المخزن')) {
+            window.location.href = 'products.html';
+        } else if (text.includes('بيع') || text.includes('فاتورة بيع')) {
+            window.location.href = 'sales.html';
+        } else if (text.includes('شراء') || text.includes('فاتورة شراء')) {
+            window.location.href = 'purchases.html';
+        } else if (text.includes('التصنيفات')) {
+            window.location.href = 'categories.html';
+        } else if (text.includes('العملات')) {
+            window.location.href = 'currencies.html';
+        } else if (text.includes('التقارير')) {
+            window.location.href = 'reports.html';
+        } else if (text.includes('العملاء')) {
+            window.location.href = 'customers.html';
+        } else if (text.includes('خروج') || text.includes('تسجيل خروج')) {
+            logout();
+        } else {
+            voiceSynth.speak("عذراً، لم أفهم الأمر. يمكنك أن تقول: افتح المنتجات، أو فاتورة بيع.");
+        }
+    }
+
+    voiceBtn.addEventListener('click', startListening);
+</script>
 </body>
 </html>

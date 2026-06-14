@@ -1,0 +1,251 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>التصنيفات | نظام إدارة المتجر</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+</head>
+<body>
+<div class="app-wrapper">
+  <!-- //slidebar -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">متجر الهدى</div>
+        <ul class="sidebar-menu">
+            <li class="menu-item"><a href="dashboard.html" class="menu-link"><i class="fas fa-chart-line menu-icon"></i> الرئيسية</a></li>
+            <li class="menu-item"><a href="products.html" class="menu-link"><i class="fas fa-box menu-icon"></i> المنتجات</a></li>
+            <li class="menu-item"><a href="categories.html" class="menu-link active"><i class="fas fa-tags menu-icon"></i> التصنيفات</a></li>
+            <li class="menu-item"><a href="sales.html" class="menu-link"><i class="fas fa-shopping-cart menu-icon"></i> فاتورة بيع</a></li>
+            <li class="menu-item"><a href="purchases.html" class="menu-link"><i class="fas fa-truck menu-icon"></i> فاتورة شراء</a></li>
+            <li class="menu-item"><a href="currencies.html" class="menu-link"><i class="fas fa-money-bill-wave menu-icon"></i> العملات</a></li>
+            <li class="menu-item"><a href="reports.html" class="menu-link"><i class="fas fa-file-contract menu-icon"></i> التقارير</a></li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        <header class="main-header">
+            <div class="header-right">
+                <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
+                <h1 class="header-title">التصنيفات</h1>
+            </div>
+            <div class="header-actions">
+                <span id="userInfo">أهلاً، <span id="userName"></span></span>
+                <button class="btn-outline" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> خروج</button>
+            </div>
+        </header>
+
+        <div class="page-container">
+            <!-- card GRUD-->
+            <div class="card" id="categoryFormCard" style="display: none;">
+                <h2 id="formTitle">إضافة تصنيف</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>اسم التصنيف</label>
+                        <input type="text" id="catName" class="form-control" placeholder="أدخل اسم التصنيف" required>
+                    </div>
+                    <div class="form-group">
+                        <label>الوصف (اختياري)</label>
+                        <input type="text" id="catDesc" class="form-control" placeholder="وصف التصنيف">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <button class="btn btn-primary" id="saveCategoryBtn">حفظ</button>
+                    <button class="btn btn-outline" id="cancelFormBtn">إلغاء</button>
+                </div>
+            </div>
+
+            <!-- categories table-->
+            <div class="card table-container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2>قائمة التصنيفات</h2>
+                    <button class="btn btn-primary" id="showAddBtn"><i class="fas fa-plus"></i> إضافة تصنيف</button>
+                </div>
+                <table id="categoriesTable">
+                    <thead>
+                        <tr>
+                            <th>الاسم</th>
+                            <th>الوصف</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categoriesTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<button class="voice-btn" id="globalVoiceBtn"><i class="fas fa-microphone"></i></button>
+
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+    // ========== auth function=========
+    if (!localStorage.getItem('token')) window.location.href = 'index.html';
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user && user.name) document.getElementById('userName').textContent = user.name;
+
+    //  logout
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = 'index.html';
+    });
+
+    // slide minue
+    document.getElementById('menuToggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('open');
+    });
+
+    
+    let editingId = null;
+
+    async function loadCategories() {
+        try {
+            const categories = await api.get('/categories');
+            const tbody = document.getElementById('categoriesTableBody');
+            tbody.innerHTML = '';
+            categories.forEach(cat => {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = cat.name;
+                row.insertCell(1).textContent = cat.description || '';
+                const actionsCell = row.insertCell(2);
+                actionsCell.innerHTML = `
+                    <button class="btn btn-sm btn-warning" onclick="editCategory(${cat.id})"><i class="fas fa-edit"></i> تعديل</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCategory(${cat.id})"><i class="fas fa-trash"></i> حذف</button>
+                `;
+            });
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    // Add category form
+    function showAddForm() {
+        editingId = null;
+        document.getElementById('formTitle').textContent = 'إضافة تصنيف';
+        document.getElementById('categoryFormCard').style.display = 'block';
+        clearForm();
+    }
+
+    //  Edit
+    async function editCategory(id) {
+        try {
+            const categories = await api.get('/categories');
+            const cat = categories.find(c => c.id === id);
+            if (!cat) return;
+            document.getElementById('catName').value = cat.name;
+            document.getElementById('catDesc').value = cat.description || '';
+            editingId = id;
+            document.getElementById('formTitle').textContent = 'تعديل تصنيف';
+            document.getElementById('categoryFormCard').style.display = 'block';
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    // save
+    async function saveCategory() {
+        const data = {
+            name: document.getElementById('catName').value,
+            description: document.getElementById('catDesc').value
+        };
+        if (!data.name) {
+            alert('يرجى إدخال اسم التصنيف');
+            return;
+        }
+        try {
+            if (editingId) {
+                await api.put(`/categories/${editingId}`, data);
+            } else {
+                await api.post('/categories', data);
+            }
+            hideForm();
+            loadCategories();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    //  Delet
+    async function deleteCategory(id) {
+        if (confirm('هل أنت متأكد من حذف هذا التصنيف؟ (المنتجات المرتبطة لن تُحذف)')) {
+            try {
+                await api.delete(`/categories/${id}`);
+                loadCategories();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+    }
+
+    function hideForm() {
+        document.getElementById('categoryFormCard').style.display = 'none';
+        clearForm();
+    }
+
+    function clearForm() {
+        document.getElementById('catName').value = '';
+        document.getElementById('catDesc').value = '';
+        editingId = null;
+    }
+
+    // btn
+    document.getElementById('showAddBtn').addEventListener('click', showAddForm);
+    document.getElementById('saveCategoryBtn').addEventListener('click', saveCategory);
+    document.getElementById('cancelFormBtn').addEventListener('click', hideForm);
+
+    loadCategories();
+
+    // ========== Speech==========
+    const speak = (text) => {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ar-SA';
+            window.speechSynthesis.speak(utterance);
+        }
+    };
+    let globalRecognition = null;
+    let isGlobalListening = false;
+    const globalVoiceBtn = document.getElementById('globalVoiceBtn');
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+        globalRecognition = new SpeechRecognition();
+        globalRecognition.lang = 'ar-SA';
+        globalRecognition.continuous = false;
+        globalRecognition.onstart = () => {
+            isGlobalListening = true;
+            globalVoiceBtn.classList.add('listening');
+        };
+        globalRecognition.onend = () => {
+            isGlobalListening = false;
+            globalVoiceBtn.classList.remove('listening');
+        };
+        globalRecognition.onresult = (e) => {
+            const cmd = e.results[0][0].transcript;
+            if (cmd.includes('الرئيسية')) window.location.href = 'dashboard.html';
+            else if (cmd.includes('المنتجات')) window.location.href = 'products.html';
+            else if (cmd.includes('فاتورة بيع')) window.location.href = 'sales.html';
+            else if (cmd.includes('فاتورة شراء')) window.location.href = 'purchases.html';
+            else if (cmd.includes('التقارير')) window.location.href = 'reports.html';
+            else if (cmd.includes('العملات')) window.location.href = 'currencies.html';
+            else if (cmd.includes('التصنيفات')) window.location.href = 'categories.html';
+            else speak('عذراً، لم أفهم الأمر');
+        };
+        globalVoiceBtn.addEventListener('click', () => {
+            if (!isGlobalListening) {
+                speak('تحدث الآن');
+                setTimeout(() => globalRecognition.start(), 1500);
+            } else {
+                globalRecognition.stop();
+            }
+        });
+    } else if (globalVoiceBtn) globalVoiceBtn.style.display = 'none';
+</script>
+</body>
+</html>

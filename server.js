@@ -10,6 +10,7 @@ const currencyRoutes = require('./routes/currencyRoutes');
 const exchangeRoutes = require('./routes/exchangeRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
 const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
@@ -26,6 +27,7 @@ app.use('/api/currencies', currencyRoutes);
 app.use('/api/exchange', exchangeRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/categories', categoryRoutes);
 app.use((req, res) => {
   res.status(404).json({ message: 'المسار غير موجود' });
 });

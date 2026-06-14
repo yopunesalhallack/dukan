@@ -1,34 +1,131 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>تسجيل الدخول - نظام إدارة المحل</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="./css/style.css">
+  <style>
+   
+    body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: var(--primary-color); 
+        }
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      padding: 40px;
+      border-radius: var(--border-radius);
+      background: white;
+      box-shadow: var(--shadow-md);
+      text-align: center;
+    }
+    .login-logo {
+      font-size: 30px;
+      font-weight: bold;
+      color: var(--primary-color);
+      margin-bottom: 30px;
+    }
+    .login-logo i {
+      margin-left: 10px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+      text-align: right;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #333;
+    }
+    .form-control {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+      box-sizing: border-box;
+    }
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary-color);
+    }
+    .btn {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s;
+      width: 100%;
+    }
+    .btn-primary {
+      background-color: #2980b9;
+    }
+    .btn-primary:hover {
+      background-color: #1c6ea4;
+    }
+    .error-message {
+      color: #e74c3c;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+  </style>
 </head>
 <body>
-  <div class="login-container">
-    <h2>تسجيل الدخول</h2>
+  <div class="login-card">
+    <div class="login-logo">
+      <i class="fas fa-shopping-cart"></i> متجر الهدى
+    </div>
+
     <form id="loginForm">
-      <input type="email" id="email" placeholder="البريد الإلكتروني" required>
-      <input type="password" id="password" placeholder="كلمة المرور" required>
-      <button type="submit">دخول</button>
+      <div class="form-group">
+        <label for="email">البريد الإلكتروني</label>
+        <input type="email" id="email" class="form-control" placeholder="example@mail.com" required>
+      </div>
+      <div class="form-group">
+        <label for="password">كلمة المرور</label>
+        <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+      </div>
+      <button type="submit" class="btn btn-primary">دخول</button>
+      <div id="errorMsg" class="error-message"></div>
     </form>
-    <p id="errorMsg" style="color:red;"></p>
   </div>
+
   <script src="js/api.js"></script>
   <script>
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
+      const errorMsg = document.getElementById('errorMsg');
+      errorMsg.textContent = '';
+      
+      if (!email || !password) {
+        errorMsg.textContent = 'يرجى إدخال البريد الإلكتروني وكلمة المرور';
+        return;
+      }
+      
       try {
+        //  use api  from  (js/api.js)
+        if (typeof api === 'undefined') {
+          throw new Error('API غير متاح. تأكد من تحميل js/api.js');
+        }
         const response = await api.post('/auth/login', { email, password });
         localStorage.setItem('token', response.token);
         localStorage.setItem('user', JSON.stringify(response.user));
         window.location.href = '/dashboard.html';
       } catch (err) {
-        document.getElementById('errorMsg').textContent = err.message;
+        errorMsg.textContent = err.message;
       }
     });
   </script>
